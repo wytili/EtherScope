@@ -1,7 +1,8 @@
-<h1 align="center">
+<p align="center">
   <img src="source/assets/logo.svg" width="100" height="100" style="vertical-align: middle;" />
-  <span style="font-size: 24px; vertical-align: middle;">Sniffer</span>
-</h1>
+</p>
+<h1 align="center">Sniffer</h1>
+
 
 > <p align="center">
 >  A Network Sniffer built with PyQt5 and Scapy.

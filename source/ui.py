@@ -1,15 +1,11 @@
-import json
-
 import scapy.plist
-from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import (QMainWindow, QTextEdit, QTreeWidget, QTreeWidgetItem,
                              QTableWidget, QVBoxLayout, QSplitter,
-                             QWidget, QToolBar, QPushButton, QComboBox, QStatusBar, QFileDialog, )
+                             QWidget, QToolBar, QPushButton, QComboBox, QFileDialog, )
 from PyQt5.QtGui import QIcon
-
-
 from table import *
 from packet import *
+
 
 # window for the sniffer
 class SnifferWindow(QMainWindow):
@@ -22,22 +18,22 @@ class SnifferWindow(QMainWindow):
         self.populate_interfaces()
         self.packet_parser = PacketParser(PacketTable.header, self.interface_select.currentText())
         self.packet_capturer = PacketCapturer()
+        if sys.platform == "win32":  # taskbar icon
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("sniffer")
 
     def initUI(self):
         self.setWindowTitle('Sniffer    @copyright wytili 2023')
-        self.setWindowIcon(QIcon('assets/export_icon.png'))
+        self.setWindowIcon(QIcon('assets/logo.svg'))
         self.setGeometry(300, 300, 1200, 900)
         self.create_central_widget()  # show packets in table
 
-        # tip: toolbar has to be created after central widget, so that tools can connect to the table
+        # note: toolbar has to be created after central widget, so that tools can connect to the table
         self.create_toolbar()  # toolbar below menu
-        # self.statusBar = QStatusBar()  # status bar at bottom
-        # self.setStatusBar(self.statusBar)  # status
 
     def create_toolbar(self):
         toolbar = QToolBar("Main Toolbar")
         self.addToolBar(toolbar)
-
 
         # dropdown menu for selecting interface
         self.interface_select = QComboBox()
@@ -57,30 +53,27 @@ class SnifferWindow(QMainWindow):
         self.delete_btn = QPushButton()  # delete button
         self.delete_btn.setToolTip('delete')
         self.delete_btn.setIcon(QIcon('assets/delete_icon.svg'))
-        export_btn = QPushButton()  # export button
-        export_btn.setToolTip('export')
-        export_btn.setIcon(QIcon('assets/export_icon.png'))
-        export_btn.clicked.connect(self.on_export_click)
-        import_btn = QPushButton()  # import button
-        import_btn.setToolTip('import')
-        import_btn.setIcon(QIcon('assets/import_icon.png'))
-        import_btn.clicked.connect(self.on_import_click)
-        search_btn = QPushButton()  # search button
-        search_btn.setToolTip('search')
-        search_btn.setIcon(QIcon('assets/search_icon.png'))
-        filter_btn = QPushButton()  # filter button
-        filter_btn.setToolTip('filter')
-        filter_btn.setIcon(QIcon('assets/filter_icon.png'))
+        self.export_btn = QPushButton()  # export button
+        self.export_btn.setToolTip('export')
+        self.export_btn.setIcon(QIcon('assets/export_icon.png'))
+        self.export_btn.clicked.connect(self.on_export_click)
+        self.import_btn = QPushButton()  # import button
+        self.import_btn.setToolTip('import')
+        self.import_btn.setIcon(QIcon('assets/import_icon.png'))
+        self.import_btn.clicked.connect(self.on_import_click)
+        # self.filter_btn = QPushButton()  # filter button
+        # self.filter_btn.setToolTip('filter')
+        # self.filter_btn.setIcon(QIcon('assets/filter_icon.png'))
 
         # add widgets to toolbar
         toolbar.addWidget(self.interface_select)
         toolbar.addWidget(self.capture_btn)
         toolbar.addWidget(self.stop_btn)
         toolbar.addWidget(self.delete_btn)
-        toolbar.addWidget(export_btn)
-        toolbar.addWidget(import_btn)
-        toolbar.addWidget(search_btn)
-        toolbar.addWidget(filter_btn)
+        toolbar.addWidget(self.export_btn)
+        toolbar.addWidget(self.import_btn)
+
+        # toolbar.addWidget(self.filter_btn)
 
     def create_central_widget(self):
         central_widget = QWidget()
@@ -179,7 +172,10 @@ class SnifferWindow(QMainWindow):
         self.capture_btn.setEnabled(False)
         self.stop_btn.setIcon(QIcon('assets/red_stop_icon.svg'))
         self.packet_parser.setInterface(self.interface_select.currentText())
-        self.stop_btn.setEnabled(True)
+        self.stop_btn.setEnabled(True)  # enable stop if capture starts
+        self.interface_select.setEnabled(False)  # disable interface select if capturing
+        self.export_btn.setEnabled(False)   # disable export if capturing
+        self.import_btn.setEnabled(False)  # disable import if capturing
 
     # click handler for the stop button
     def on_stop_click(self):
@@ -188,9 +184,13 @@ class SnifferWindow(QMainWindow):
         self.capture_btn.setEnabled(True)
         self.stop_btn.setIcon(QIcon('assets/grey_stop_icon.svg'))
         self.stop_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
+        self.interface_select.setEnabled(True)
+        self.import_btn.setEnabled(True)
+        self.export_btn.setEnabled(True)
 
     def on_export_click(self):
+        if not self.packet_manager.packets:
+            return
         filename, _ = QFileDialog.getSaveFileName(self, "Save to Pcap File", "", "Pcap (*.pcap)")
         if filename:
             self.save_packets_pcap(filename)
@@ -207,17 +207,14 @@ class SnifferWindow(QMainWindow):
     def load_and_parse_packets(self, filepath):
         try:
             packets = rdpcap(filepath)
+            self.packet_manager.clear()
             for packet in packets:
-                timestamp = packet.time
                 headerPacket, treePacket = self.packet_parser.parse(packet)
-                print(f"Loaded headerpacket: {headerPacket}")
-                print(f"Loaded treePacket: {treePacket}")
-                print(f"Loaded {len(packets)} packets from {filepath} successfully")
                 self.packet_manager.add_file_Packet(packet, headerPacket, treePacket)
         except Exception as e:
             print(f"Error loading and parsing PCAP file: {e}")
             import traceback
-            traceback.print_exc()  # 打印完整的 traceback
+            traceback.print_exc()
 
     def get_packet_parser(self):
         return self.packet_parser

@@ -3,11 +3,12 @@ from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
 
+
 # show table to user
 class PacketTable:
     header = ["No", "Time", "Source", "Destination", "Protocol", "Length", "Info"]
     proto_color = {"Ethernet": "#ffcdd2", "IP": "#e1bee7", "TCP": "#bbdefb", "UDP": "#b2dfdb", "ARP": "#f0f4c3",
-                     "ICMP": "#d7ccc8", "DNS": "#cfd8dc", "HTTP": "#d1c4e9", "IPv6": "#f8bbd0"}
+                   "ICMP": "#d7ccc8", "DNS": "#cfd8dc", "HTTP": "#d1c4e9", "IPv6": "#f8bbd0"}
 
     def __init__(self, tableWidget):
         self.tableWidget = tableWidget
@@ -44,9 +45,9 @@ class PacketTable:
         self.tableWidget.setRowHeight(rowPosition, 40)
 
         # real time packet is a dict
-        headerPacket["No"] = rowPosition + 1  # 使用行位置作为序号
-        headerPacket["Time"] = time.strftime("%H:%M:%S", time.localtime(packet.time))  # 设置到达时间
-        headerPacket["Length"] = len(packet)  # 数据包的长度
+        headerPacket["No"] = rowPosition + 1
+        headerPacket["Time"] = time.strftime("%H:%M:%S", time.localtime(packet.time))
+        headerPacket["Length"] = len(packet)
 
         protocol = headerPacket.get("Protocol", "")
         color = self.proto_color.get(protocol, "#FFFFFF")

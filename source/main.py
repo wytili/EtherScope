@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QThread
 from ui import SnifferWindow
 from table import PacketTable
-from packet import PacketCapturer, PacketParser
+from packet import PacketCapturer
 
 # the entry point of the program
 def main():

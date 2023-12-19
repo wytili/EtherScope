@@ -1,6 +1,5 @@
 from PyQt5.QtCore import pyqtSignal, QCoreApplication, QObject
 from scapy.all import *
-from scapy.contrib.igmp import IGMP
 from scapy.layers.inet import IP
 import re
 
@@ -11,6 +10,15 @@ def get_network_ifaces():
         if_repr = resolve_iface(iface).description
         output.append(if_repr)
     return list(set(output))
+
+def parseHttpHeaders(rawData):
+    headers = {}
+    lines = rawData.decode('utf-8', 'ignore').split('\r\n')
+    for line in lines:
+        if ':' in line:
+            key, value = line.split(':', 1)
+            headers[key.strip()] = value.strip()
+    return headers
 
 # capture class
 class PacketCapturer(QObject):
@@ -64,7 +72,7 @@ class PacketParser(QObject):
         self.firstPacketTime = None
         self.headerPacket = dict.fromkeys(self.format)
         self.treePacket = {}
-        self.fragments_cache = {}  # 用于存储分片的缓存
+        self.fragments_cache = {}  # cache for fragmented packets
 
     # parse the packet and make a list
     def parse(self, packet):
@@ -156,60 +164,57 @@ class PacketParser(QObject):
             self.headerPacket["Info"] = info
 
     def handle_fragments(self, layer):
-        # 为分片创建唯一标识
         frag_id = (layer.src, layer.dst, layer.id)
         if frag_id not in self.fragments_cache:
             self.fragments_cache[frag_id] = []
 
-        # 添加新的分片之前检查是否已存在
+        # check if the fragment is already in the cache
         if not any(frag.frag == layer.frag for frag in self.fragments_cache[frag_id]):
             self.fragments_cache[frag_id].append(layer)
 
-        # 检查是否收到所有分片
+        # check if all fragments are received
         if not layer.flags.MF and self.is_all_fragments_received(frag_id):
-            # 重组分片
+            # reassemble the packet
             reassembled_packet = self.reassemble_fragments(frag_id)
             if reassembled_packet:
-                # 使用重组后的数据包继续解析
-                self.parse(reassembled_packet)
+                self.parse(reassembled_packet)  # continue parsing
 
     def is_all_fragments_received(self, frag_id):
         fragments = self.fragments_cache[frag_id]
-        # 对分片进行排序
+        # sort fragments by offset
         fragments.sort(key=lambda x: x.frag)
         expected_offset = 0
         for frag in fragments:
-            # 检查分片偏移是否匹配预期
+            # check if the offset is correct
             if frag.frag != expected_offset:
                 return False
-            expected_offset += len(frag) // 8  # 转换为 8 字节块数
-        # 检查最后一个分片是否标记了结束
+            expected_offset += len(frag) // 8  # 8 bits per byte
+        # check if the last fragment has the MF flag set to 0
         return not fragments[-1].flags.MF
 
     def reassemble_fragments(self, frag_id):
-        # 对分片进行排序
+        # sort fragments by offset
         fragments = sorted(self.fragments_cache[frag_id], key=lambda x: x.frag)
-        # 重组数据包
+        # reassemble payload
         reassembled_payload = b''
         for frag in fragments:
             reassembled_payload += bytes(frag.payload)
-        # 创建新的 IP 层
+        # create reassembled packet
         first_fragment = fragments[0]
         reassembled_ip = IP(
             src=first_fragment.src,
             dst=first_fragment.dst,
             proto=first_fragment.proto,
             len=len(reassembled_payload) + 20,
-            frag=0,  # 设置片偏移为 0
-            flags=0  # 设置标志为未分片
+            frag=0,  # set offset to 0
+            flags=0  # set MF and DF flags to 0
         )
-        reassembled_ip.chksum = None  # 让 Scapy 重新计算校验和
+        reassembled_ip.chksum = None  # recalculate checksum
         reassembled_packet = reassembled_ip / reassembled_payload
-        del self.fragments_cache[frag_id]  # 清除分片缓存
+        del self.fragments_cache[frag_id]  # clear cache
         return reassembled_packet
 
     def parseARP(self, layer):
-        # 更新 headerPacket
         self.headerPacket["Protocol"] = layer.name
         self.headerPacket["Source"] = layer.psrc
         self.headerPacket["Destination"] = layer.pdst
@@ -230,7 +235,6 @@ class PacketParser(QObject):
         }
 
     def parseIPv6(self, layer):
-        # 更新 headerPacket
         self.headerPacket["Protocol"] = layer.name
         self.headerPacket["Source"] = layer.src
         self.headerPacket["Destination"] = layer.dst
@@ -249,7 +253,6 @@ class PacketParser(QObject):
         }
 
     def parseTCP(self, layer):
-        # 更新 headerPacket
         self.headerPacket["Protocol"] = layer.name
         flagList = [flag for flag in self.flag if layer.flags & self.flag[flag]]
         flags = ", ".join(flagList)
@@ -270,7 +273,6 @@ class PacketParser(QObject):
         }
 
     def parseUDP(self, layer):
-        # 更新 headerPacket
         self.headerPacket["Protocol"] = layer.name
         info = "{}->{} [UDP] Len={}".format(layer.sport, layer.dport, layer.len)
         self.headerPacket["Info"] = info
@@ -321,8 +323,8 @@ class PacketParser(QObject):
 
         self.treePacket["DNS"]["Flags"] = dns_flags
 
-        # 解析 DNS 查询部分
-        if layer.qr == 0:  # DNS 查询
+        # DNS Query
+        if layer.qr == 0:
             queries = []
             for query in layer.qd:
                 query_info = {
@@ -333,8 +335,8 @@ class PacketParser(QObject):
                 queries.append(query_info)
             self.treePacket["DNS"]["Queries"] = queries
 
-        # 解析 DNS 响应部分
-        elif layer.qr == 1:  # DNS 响应
+        # DNS Answer
+        elif layer.qr == 1:
             answers = []
             for answer in layer.an:
                 answer_info = {
@@ -348,11 +350,12 @@ class PacketParser(QObject):
             self.treePacket["DNS"]["Answers"] = answers
 
     def parseHttp(self, layer):
-        httpFormat = r"(?P<method>GET|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|HEAD)\s(?P<path>.*?)\sHTTP/(?P<version>[\d\.]+)|HTTP/(?P<res_version>[\d\.]+)\s(?P<status_code>\d{3})\s(?P<reason>.*)"
+        httpFormat = r"(?P<method>GET|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|HEAD)\s(?P<path>.*?)\sHTTP/(?P<version>[" \
+                     r"\d\.]+)|HTTP/(?P<res_version>[\d\.]+)\s(?P<status_code>\d{3})\s(?P<reason>.*)"
         searchObj = re.search(httpFormat, str(raw(layer[0])))
         if searchObj:
             self.headerPacket["Protocol"] = "HTTP"
-            headers = self.parseHttpHeaders(raw(layer[0]))
+            headers = parseHttpHeaders(raw(layer[0]))
 
             if searchObj.group('method'):  # HTTP Request
                 self.headerPacket.update({
@@ -378,15 +381,6 @@ class PacketParser(QObject):
                 }
             return True
         return False
-
-    def parseHttpHeaders(self, rawData):
-        headers = {}
-        lines = rawData.decode('utf-8', 'ignore').split('\r\n')
-        for line in lines:
-            if ':' in line:
-                key, value = line.split(':', 1)
-                headers[key.strip()] = value.strip()
-        return headers
 
     def headerParse(self, packet):
         if self.packet != packet:

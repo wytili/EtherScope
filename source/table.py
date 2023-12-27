@@ -28,21 +28,26 @@ class PacketTable:
         self.tableWidget.insertRow(rowPosition)
         self.tableWidget.setRowHeight(rowPosition, 40)
 
-        # real time packet is a list
-        headerPacket[0] = rowPosition + 1
-        headerPacket[1] = time.strftime("%H:%M:%S", time.localtime(packet.time))
-        headerPacket[5] = len(packet)
+        # update headerPacket list to dictionary
+        headerPacketDict = dict(zip(PacketTable.header, headerPacket))
+
+        # update values
+        headerPacketDict["No"] = rowPosition + 1
+        headerPacketDict["Time"] = time.strftime("%H:%M:%S", time.localtime(packet.time))
+        headerPacketDict["Length"] = len(packet)
 
         color = self.proto_color.get(protocol, "#FFFFFF")
 
         # add data to table
-        for col, data in enumerate(headerPacket):
-            item = QTableWidgetItem(str(data))
-            item.setTextAlignment(Qt.AlignCenter)  # align center
-            item.setBackground(QtGui.QColor(color))  # set color for different protocol
+        for col, key in enumerate(PacketTable.header):
+            value = headerPacketDict.get(key, "")
+            item = QTableWidgetItem(str(value))
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setBackground(QtGui.QColor(color))
             self.tableWidget.setItem(rowPosition, col, item)
+
         self.packets.append(packet)
-        self.headerPackets.append(headerPacket)
+        self.headerPackets.append(headerPacketDict)  # Store as a dictionary
         self.treePackets.append(treePacket)
 
     def add_file_Packet(self, packet, headerPacket, treePacket):
@@ -86,7 +91,7 @@ class PacketTable:
 
     def filter_packets(self):
         for row in range(self.tableWidget.rowCount()):
-            protocol = self.headerPackets[row][4]
+            protocol = self.headerPackets[row].get("Protocol", "")
             if self.current_filter_protocol == "All" or protocol == self.current_filter_protocol:
                 self.tableWidget.showRow(row)
             else:

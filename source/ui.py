@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import (QMainWindow, QTextEdit, QTreeWidget, QTreeWidgetIte
                              QTableWidget, QVBoxLayout, QSplitter,
                              QWidget, QToolBar, QPushButton, QComboBox, QFileDialog, )
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QSizePolicy
+
 from table import *
 from packet import *
 
@@ -23,7 +25,7 @@ class SnifferWindow(QMainWindow):
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("sniffer")
 
     def initUI(self):
-        self.setWindowTitle('Sniffer    @copyright wytili 2023')
+        self.setWindowTitle('Sniffer    ©️copyright wytili 2023')
         self.setWindowIcon(QIcon('assets/logo.svg'))
         self.setGeometry(300, 300, 1200, 900)
         self.create_central_widget()  # show packets in table
@@ -61,9 +63,21 @@ class SnifferWindow(QMainWindow):
         self.import_btn.setToolTip('import')
         self.import_btn.setIcon(QIcon('assets/import_icon.png'))
         self.import_btn.clicked.connect(self.on_import_click)
-        # self.filter_btn = QPushButton()  # filter button
-        # self.filter_btn.setToolTip('filter')
-        # self.filter_btn.setIcon(QIcon('assets/filter_icon.png'))
+
+        # spacer
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # filter
+        self.protocol_select = QComboBox()
+        self.protocol_select.setFixedSize(150, 33)
+        self.protocol_select.setStyleSheet("QComboBox { font-size: 20px; }")
+        self.protocol_select.addItem("All")
+        self.protocol_select.addItems(PacketTable.proto_color.keys())  # add protocols to dropdown
+        self.filter_btn = QPushButton()  # filter button
+        self.filter_btn.setToolTip('filter')
+        self.filter_btn.setIcon(QIcon('assets/filter_icon.png'))
+        self.filter_btn.clicked.connect(self.filter_packets)
 
         # add widgets to toolbar
         toolbar.addWidget(self.interface_select)
@@ -72,8 +86,9 @@ class SnifferWindow(QMainWindow):
         toolbar.addWidget(self.delete_btn)
         toolbar.addWidget(self.export_btn)
         toolbar.addWidget(self.import_btn)
-
-        # toolbar.addWidget(self.filter_btn)
+        toolbar.addWidget(spacer)
+        toolbar.addWidget(self.protocol_select)
+        toolbar.addWidget(self.filter_btn)
 
     def create_central_widget(self):
         central_widget = QWidget()
@@ -163,6 +178,10 @@ class SnifferWindow(QMainWindow):
         ifaces = get_network_ifaces()
         for iface in ifaces:
             self.interface_select.addItem(iface)
+
+    def filter_packets(self):
+        selected_protocol = self.protocol_select.currentText()
+        self.packet_manager.update_filter_protocol(selected_protocol)
 
     # click handler for the capture button
     def on_capture_click(self):

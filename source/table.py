@@ -15,8 +15,15 @@ class PacketTable:
         self.packets = []
         self.headerPackets = []
         self.treePackets = []
+        self.current_filter_protocol = "All"
 
     def add_real_time_Packet(self, packet, headerPacket, treePacket):
+        protocol = headerPacket[4]
+
+        # filter packets
+        if self.current_filter_protocol != "All" and protocol != self.current_filter_protocol:
+            return  # do not add this packet
+
         rowPosition = self.tableWidget.rowCount()
         self.tableWidget.insertRow(rowPosition)
         self.tableWidget.setRowHeight(rowPosition, 40)
@@ -26,7 +33,6 @@ class PacketTable:
         headerPacket[1] = time.strftime("%H:%M:%S", time.localtime(packet.time))
         headerPacket[5] = len(packet)
 
-        protocol = headerPacket[4]
         color = self.proto_color.get(protocol, "#FFFFFF")
 
         # add data to table
@@ -77,3 +83,15 @@ class PacketTable:
         except Exception as e:
             print(f"Error in getPacket at index {index}: {e}")
             return None, None
+
+    def filter_packets(self):
+        for row in range(self.tableWidget.rowCount()):
+            protocol = self.headerPackets[row][4]
+            if self.current_filter_protocol == "All" or protocol == self.current_filter_protocol:
+                self.tableWidget.showRow(row)
+            else:
+                self.tableWidget.hideRow(row)
+
+    def update_filter_protocol(self, protocol):
+        self.current_filter_protocol = protocol
+        self.filter_packets()

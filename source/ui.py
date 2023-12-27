@@ -24,7 +24,7 @@ class SnifferWindow(QMainWindow):
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("sniffer")
 
     def initUI(self):
-        self.setWindowTitle('Sniffer    ©️copyright wytili 2023')
+        self.setWindowTitle('EtherScope    ©️copyright wytili 2023')
         self.setWindowIcon(QIcon('assets/logo.svg'))
         self.setGeometry(300, 300, 1200, 900)
         self.create_central_widget()  # show packets in table

@@ -42,7 +42,7 @@ EtherScope/
 │   ├── ui.py                # GUI
 │   ├── packet.py            # capture and parse packets
 │   ├── table.py             # show packets on the table 
-│   └── assets/           	 # directory to store images
+│   └── assets/              # directory to store images
 │── README.md
 └── LICENSE.txt              
 ```

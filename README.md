@@ -12,6 +12,12 @@
 	<img src="source/assets/screenshot.jpg" width=650 height=500>
 </p>
 
+## Prerequisites
+
+For **Windows** Users, **make sure to install a Windows packet capturing library** before running EtherScope, [Npcap](https://npcap.com/#download) is recommended.
+
+Please note that **additional steps or considerations** may be required for full compatibility on **Linux** and **macOS**.
+
 ## QuickStart
 
 Download the latest executable from the [Releases page](https://github.com/wytili/EtherScope/releases).
